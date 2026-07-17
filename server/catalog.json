@@ -1,0 +1,292 @@
+{
+  "serverName": "MerlinProject",
+  "generatedFrom": "MerlinProject 9.2.0",
+  "tools": [
+    {
+      "name": "get_schema_types",
+      "description": "Return the full XSD definition for a named set of types from the Merlin MCP schema. Used after consulting `schema://reduced` to pull detailed information for just the types currently relevant to the client's task, avoiding the full schema cost.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "include_groups": {
+            "default": false,
+            "description": "If true, also include the definitions of every `<group>` and `<attributeGroup>` referenced directly or transitively by the included type definitions.",
+            "type": "boolean"
+          },
+          "include_inherited": {
+            "default": false,
+            "description": "If true, also include ancestor type definitions.",
+            "type": "boolean"
+          },
+          "types": {
+            "description": "Entity type names to retrieve. Must be non-empty.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "types"
+        ]
+      }
+    },
+    {
+      "name": "list_open_documents",
+      "description": "List all documents currently open in the host application, together with which one (if any) is the session's current document and which is frontmost in the host app.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "set_current_document",
+      "description": "Designate an open document as the current document for this MCP session. All subsequent data-access tools operate on the current document until it is closed or replaced.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "description": "Disambiguating document name: filename without extension, optionally prefixed by path segments. If omitted, the frontmost open document is used.",
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "get_objects",
+      "description": "Retrieve one or more objects by id from the current document. Relationships on returned objects are always serialized as idref/idrefs references; the referenced objects are not recursively inlined.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "expand": {
+            "description": "Relationship keypaths to follow from each root. Each keypath is a dot-separated chain of relationship names from schema://reduced; a segment may carry a `{n}` recursion bound (positive integer) meaning 'follow this relationship up to n levels deep, including every intermediate object'. Example: `childActivities{3}.assignments`. Every reached object is materialized as a top-level entry in `<objects>`; relationships between objects are always idref-encoded regardless of expand. Omitted or empty: no expansion.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "fields": {
+            "description": "Attribute and relationship names to include. Names refer to the XML element/attribute names defined in schema://full. Omitted: every scalar attribute and relationship the type supports is returned. Provided (including the empty array): each object returns `id`, `type`, and any name from `fields` that its type supports; unsupported names are silently ignored. `expand` independently controls whether referenced objects are materialized in `<objects>`.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "ids": {
+            "description": "Object identifiers to retrieve. The well-known id `project:current` refers to the root Project of the current document. Must be non-empty.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "ids"
+        ]
+      }
+    },
+    {
+      "name": "find_objects",
+      "description": "Find objects of a given type in the current document, optionally filtered by a Merlin predicate (the same XML language used by Merlin's saved filters and style conditions). Results are serialized in the same envelope shape as `get_objects`: each matching object appears once inside `<objects>`, relationships are idref-encoded, and any `expand` keypaths pull additional objects into `<objects>` alongside the results. Pagination is cursor-based: when more results remain, the response carries `<nextCursor>` and `<hasMore>true</hasMore>`; passing that cursor back in a subsequent call — with the same `type`, `predicate`, and `sort` — retrieves the next page.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "description": "Opaque cursor returned by a previous `find_objects` call as `<nextCursor>`. Pass it unchanged to retrieve the next page. The cursor is bound to the original `type`, `predicate`, and `sort` arguments — reusing it with different values returns `cursor_mismatch`. Omit on the first call.",
+            "type": "string"
+          },
+          "expand": {
+            "description": "Relationship keypaths to follow from each matching result, with the same semantics as in `get_objects`.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "fields": {
+            "description": "Attribute and relationship names to include on each result. Same semantics as in `get_objects`: omitted returns the full scalar + relationship content; supplied (including empty) restricts output to `id`, `type`, and any name from `fields` the type supports.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "limit": {
+            "description": "Maximum number of results on this page. Default 50; capped at 100.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "predicate": {
+            "description": "Optional XML predicate document restricting the result set. Root element must be either `<ComparisonPredicate>` or `<CompoundPredicate>`; see `schema://full` for the full grammar and the MCP spec for a structural summary. Omitted: match every object of `type`.",
+            "type": "string"
+          },
+          "sort": {
+            "description": "Sort descriptors applied to the result page. Each entry is an attribute name, optionally prefixed with `-` for descending order. `id` is a shorthand for the object's uniqueID. Default: ascending by id.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": {
+            "description": "Entity type name (as listed in schema://reduced). Case-insensitive on the first letter: `activity` and `Activity` both resolve to the Activity entity. Must name a queryable type: activity, assignment, dependency, resource, project, file, risk, issue, information, checkList, checkListItem, or event.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      }
+    },
+    {
+      "name": "count_objects",
+      "description": "Count objects of a given type in the current document, optionally filtered by the same Merlin predicate XML language used by `find_objects`. The result set is not materialized — only the total count is returned, so this is the cheap way to size a query before paging through it. The response carries `<type>` and `<count>` inside `<meta>` and has no `<objects>` block.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "predicate": {
+            "description": "Optional XML predicate document restricting the counted set. Same language as `find_objects` (see schema://full for the full grammar). Omitted: every object of `type` is counted.",
+            "type": "string"
+          },
+          "type": {
+            "description": "Entity type name (as listed in schema://reduced). Case-insensitive on the first letter, same queryable set as `find_objects`: activity, assignment, dependency, resource, project, file, risk, issue, information, checkList, checkListItem, or event.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      }
+    },
+    {
+      "name": "list_related",
+      "description": "Traverse a single named relationship of an object in the current document, returning the related ids one page at a time. Use this when a relationship is too large to inline via `get_objects`'s `expand`. To-many relationships are paginated in their natural order — outline order for `childActivities`, attachment order for `attachments`, and so on — falling back to ascending uniqueID for unordered to-many relationships. To-one relationships return at most one related id. Pagination is cursor-based and works exactly like `find_objects`: when more results remain the response carries `<hasMore>true</hasMore>` and a `<nextCursor>`; passing that cursor back — with the same `id` and `relation` — retrieves the next page.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "description": "Opaque cursor returned by a previous `list_related` call as `<nextCursor>`. Pass it unchanged to retrieve the next page. The cursor is bound to the original `id` and `relation`; reusing it with different values returns `cursor_mismatch`.",
+            "type": "string"
+          },
+          "expand": {
+            "description": "Relationship keypaths to follow from each related object, with the same semantics as in `get_objects`.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "fields": {
+            "description": "Attribute and relationship names to include on each related object. Same semantics as in `get_objects`: omitted returns the full scalar+relationship content; supplied (including empty) restricts output to `id`, `type`, and any name from `fields` the type supports.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "id": {
+            "description": "Source object identifier. The well-known id `project:current` resolves to the root Project of the current document.",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum number of related ids on this page. Default 50; capped at 100.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "relation": {
+            "description": "Relationship name as listed for the source object's type in schema://reduced. Both to-one and to-many relationships are accepted. Names that do not exist on the source's entity produce an `unknown_relation` error.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "relation"
+        ]
+      }
+    },
+    {
+      "name": "get_media",
+      "description": "Retrieve the binary contents of a media blob from the current document. The `media` complex type in the Merlin schema identifies an embedded BLOB by its `digest` (a SHA hash that also serves as the BLOB's content-addressed key). Object tools (`get_objects`, `find_objects`, `list_related`) surface `media` elements with their attributes (`name`, `size`, `digest`, `type`) but never the bytes; `get_media` is the dedicated channel for the bytes.\n\nThe response is in two parts: a small XML envelope carrying the resolved `<media>` metadata, plus a binary content part (base64-encoded, with a populated `mimeType`) carrying the full blob. Range / partial reads are not supported in this version — if the media exceeds `max_bytes` (or the server's hard cap of 67108864 bytes) the call fails with `media_too_large` rather than returning a truncated payload.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "digest": {
+            "description": "SHA digest as found in a `media` element's `digest` attribute. Matching is exact and case-sensitive.",
+            "type": "string"
+          },
+          "max_bytes": {
+            "description": "Refuse to return media whose size exceeds this many bytes. Default and upper bound is 67108864.",
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "digest"
+        ]
+      }
+    },
+    {
+      "name": "get_time_phased_values",
+      "description": "Cumulate a time-phaseable property of an object across a date range, slicing the range into uniformly-sized phases. The slice width is given by an elapsed duration (`duration_unit` + `duration_amount`), so `7 days` yields week-sized phases, `1 months` yields month-sized phases, and so on. For each phase the server calls the `METimePhasing` protocol on the target object with the phase's `[fromDate, toDate)` boundary and returns the protocol's value plus its low/high thresholds (when the property provides any).\n\nProperties that support this are marked `timePhaseable=\"true\"` in the schema (see `schema://full`). Calling with a `key` that the target object does not support yields `unknown_key`. The set of types that conform to `METimePhasing` is `Activity`, `Assignment`, and `Resource`; calling against any other type yields `not_time_phaseable`.\n\nThe final phase's `toDate` is clamped to `end_date`, so the last slice may be shorter than the requested duration when `(end_date - start_date)` does not divide evenly. Values and thresholds are serialized using the same value-type XML encodings as `get_objects` so a client already familiar with the schema does not need a separate parser.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "duration_amount": {
+            "description": "Magnitude of the slice duration in `duration_unit`. Must be strictly positive. The total number of phases is capped at 1000; requests that would produce more fail with `too_many_phases`.",
+            "exclusiveMinimum": 0,
+            "type": "number"
+          },
+          "duration_unit": {
+            "description": "Unit of the slice duration. One of `seconds`, `minutes`, `hours`, `days`, `weeks`, `months`, `quarters`, `years`. Treated as elapsed (wall-clock) time: `1 month` is 30 days, `1 year` is 365 days, etc., independent of the project's working-time calendar.",
+            "enum": [
+              "seconds",
+              "minutes",
+              "hours",
+              "days",
+              "weeks",
+              "months",
+              "quarters",
+              "years"
+            ],
+            "type": "string"
+          },
+          "end_date": {
+            "description": "Exclusive end of the cumulation range, in the same ISO 8601 form as `start_date`. Must be strictly after `start_date`.",
+            "type": "string"
+          },
+          "id": {
+            "description": "Identifier of the object whose time-phased values should be cumulated. The well-known id `project:current` resolves to the root Project of the current document, but only conforming subtypes (Activity / Assignment / Resource) produce meaningful results.",
+            "type": "string"
+          },
+          "key": {
+            "description": "Property name to cumulate. Must be one of the names marked `timePhaseable=\"true\"` for the object's type in `schema://full`. Mismatched keys yield `unknown_key`.",
+            "type": "string"
+          },
+          "start_date": {
+            "description": "Inclusive start of the cumulation range, as an ISO 8601 date-time string in the same form used elsewhere in the schema (e.g. `2010-01-01T00:00:00`). Project scheduling dates are timezone-less; clients should pass the literal date/time they would send for any other date attribute.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "start_date",
+          "end_date",
+          "duration_unit",
+          "duration_amount"
+        ]
+      }
+    }
+  ],
+  "resources": [
+    {
+      "name": "Merlin Project XML Schema (reduced overview)",
+      "uri": "schema://reduced",
+      "description": "Preferred starting point. Compact, token-efficient overview listing every identifiable entity type, its inheritance, its id/title attributes, and the named relationships used by the data-access tools. Read this first, then pull detailed definitions on demand for the few types you actually need via the `get_schema_types` tool.",
+      "mimeType": "application/xml"
+    },
+    {
+      "name": "Merlin Project XML Schema (full)",
+      "uri": "schema://full",
+      "description": "Complete XML schema, including every scalar type, enumeration, constraint, and the relationship and response-envelope extensions used by MCP tool responses. Very large and token-heavy; prefer the reduced overview plus `get_schema_types` for targeted lookups, and consult this resource only when an overview of the full schema is genuinely needed.",
+      "mimeType": "application/xml"
+    }
+  ]
+}

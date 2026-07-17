@@ -1,0 +1,27 @@
+{
+  "manifest_version": "0.3",
+  "name": "merlinproject-mcp",
+  "display_name": "Merlin Project",
+  "version": "1.0.0",
+  "description": "Read-only MCP access to the project documents open in Merlin Project on this Mac.",
+  "long_description": "Lets Claude work with the Merlin Project document you already have open on your Mac. Ask questions about your plan, search for activities, resources, assignments, risks, issues and attachments, and pull cost, work or earned-value figures over any date range — all without leaving Merlin Project. This extension only reads from your project; it never changes, saves or deletes anything. You pick which open document Claude is allowed to see at the start of each chat. Merlin Project must be installed and running on this Mac.",
+  "author": {
+    "name": "ProjectWizards"
+  },
+  "license": "MIT",
+  "keywords": ["merlin project", "merlin", "project", "gantt", "project management", "macOS", "kanban", "mind map"],
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/index.js"]
+    }
+  },
+  "compatibility": {
+    "platforms": ["darwin"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}

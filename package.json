@@ -1,0 +1,21 @@
+{
+  "name": "merlinproject-mcp-shim",
+  "version": "1.0.0",
+  "description": "Node.js MCP shim bridging MCP-capable agents (stdio) to the live Merlin Project app (Unix domain socket).",
+  "private": true,
+  "type": "module",
+  "main": "server/index.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "generate-catalog": "node scripts/generate-catalog.js",
+    "test": "node scripts/test-e2e.js",
+    "pack": "npx @anthropic-ai/mcpb pack . MerlinProject.mcpb"
+  },
+  "author": "ProjectWizards",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.15.0"
+  }
+}
