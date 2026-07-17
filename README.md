@@ -18,8 +18,8 @@ in Merlin Project's toolbar.
 
 ## Install
 
-Download `MerlinProject.mcpb` from the [releases](../../releases) page and open it with Claude
-Desktop, which will offer to install it. To build the archive from source instead:
+Build the extension archive from source, then open the resulting `MerlinProject.mcpb` with
+Claude Desktop, which will offer to install it:
 
 ```sh
 npm install
@@ -58,9 +58,7 @@ contains only the bridge.
 A Swift build of the same bridge ships with Merlin Project for use outside Claude Desktop. The
 two are behavior-identical and are kept in sync; the file headers here name their Swift
 counterparts. Unlike the Swift build, this one holds no App Group entitlement and simply
-constructs the container path directly, which works for unsandboxed processes. Recent macOS
-versions may ask you once to allow Claude Desktop's node runtime to read another app's group
-container.
+constructs the container path directly, which works for unsandboxed processes.
 
 ## Files
 
