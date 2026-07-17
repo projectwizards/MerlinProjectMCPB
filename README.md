@@ -1,52 +1,93 @@
-# MerlinProjectMCPB
+# Merlin Project MCP Extension
 
-Node.js port of the Swift `MerlinMCPShim`, packaged as an MCPB Desktop Extension. It exists
-because Claude's Desktop Extension marketplace only accepts Node.js-based extensions; behavior
-is identical to the Swift shim, and the two implementations should be kept in sync
-(`server/index.js` ↔ `MerlinMCPShim/main.swift`, `server/bridge.js` ↔
-`MerlinMCPShim/ShimBridge.swift`).
+Read-only MCP access to the project documents open in [Merlin Project](https://www.projectwizards.net)
+on your Mac, packaged as a Claude Desktop Extension (`.mcpb`).
 
-## Architecture
+Ask about your plan, search activities, resources, assignments, risks, issues and attachments,
+and pull cost, work or earned-value figures over any date range — without leaving Merlin Project.
+The extension only ever reads: it never changes, saves or deletes anything in your documents. You
+choose which open document Claude may see at the start of each chat, via the MCP access popover
+in Merlin Project's toolbar.
 
-    IDE  ⇄  stdio  ⇄  shim Server  ⇄  shim Client (cached)  ⇄  UDS  ⇄  live Server (Merlin Project)
+## Requirements
 
-- `tools/list` / `resources/list` are answered locally from `server/catalog.json`, so agents see
+- macOS
+- [Merlin Project](https://www.projectwizards.net) installed, running, and with MCP access
+  enabled for the document you want Claude to read
+- Node.js 18 or newer (Claude Desktop supplies its own runtime)
+
+## Install
+
+Download `MerlinProject.mcpb` from the [releases](../../releases) page and open it with Claude
+Desktop, which will offer to install it. To build the archive from source instead:
+
+```sh
+npm install
+npm run pack        # writes MerlinProject.mcpb
+```
+
+Merlin Project does not need to be running when you install the extension — Claude will see the
+full tool list either way, and connects to the app as soon as it is launched.
+
+## How it works
+
+Merlin Project is sandboxed and runs its MCP server inside the app, listening on a Unix domain
+socket in its App Group container. This extension is the bridge between that socket and the
+stdio transport Claude Desktop speaks:
+
+    Claude  ⇄  stdio  ⇄  extension server  ⇄  extension client (cached)  ⇄  socket  ⇄  Merlin Project
+
+- `tools/list` / `resources/list` are answered locally from `server/catalog.json`, so Claude sees
   the full tool metadata even when Merlin Project isn't running.
-- `tools/call` / `resources/read` are forwarded to the live in-app server over the Unix domain
-  socket in the shared App Group container
-  (`~/Library/Group Containers/9R6P9VZV27.net.projectwizards.merlinproject.mcp/mcp.sock`,
-  overridable via `MERLIN_MCP_SOCKET` for testing).
-- When Merlin Project isn't reachable, tool calls return a structured "not running" error and the
-  shim reconnects automatically on the next call after the app launches — no client restart.
-- The shim advertises the live server's identity when Merlin Project is up at session start, and
-  forwards the IDE's real `clientInfo` (Claude, Cursor, …) on the socket handshake so the app's
-  connected-tools popover shows the agent's name.
+- `tools/call` / `resources/read` are forwarded to the live in-app server over the socket at
+  `~/Library/Group Containers/9R6P9VZV27.net.projectwizards.merlinproject.mcp/mcp.sock`
+  (overridable via `MERLIN_MCP_SOCKET` for testing).
+- When Merlin Project isn't reachable, tool calls return a structured "not running" message
+  telling the agent to ask you to launch the app. The extension retries the connect on every
+  call, so it picks up the running app on the next request — no restart of Claude needed. It
+  deliberately never launches Merlin Project by itself.
+- The extension advertises the live server's identity when Merlin Project is up at session start,
+  and forwards the agent's real `clientInfo` on the socket handshake, so the app's connected-tools
+  popover shows "Claude" rather than the extension.
 
-Unlike the Swift shim, the Node process has no App Group entitlement — it simply constructs the
-container path directly, which works for unsandboxed processes. Note that macOS 15+ may prompt
-the user once before a foreign process (Claude Desktop's node runtime) may read another app's
-group container.
+The tools themselves — `list_open_documents`, `set_current_document`, `get_schema_types`,
+`get_objects`, `find_objects`, `count_objects`, `list_related`, `get_media` and
+`get_time_phased_values` — are implemented inside Merlin Project, not here. This repository
+contains only the bridge.
+
+A Swift build of the same bridge ships with Merlin Project for use outside Claude Desktop. The
+two are behavior-identical and are kept in sync; the file headers here name their Swift
+counterparts. Unlike the Swift build, this one holds no App Group entitlement and simply
+constructs the container path directly, which works for unsandboxed processes. Recent macOS
+versions may ask you once to allow Claude Desktop's node runtime to read another app's group
+container.
 
 ## Files
 
 - `manifest.json` — MCPB manifest (`server.type: "node"`).
 - `server/index.js` — entry point; stdio-facing MCP server.
-- `server/bridge.js` — connection cache, UDS transport, forwarding logic.
+- `server/bridge.js` — connection cache, socket transport, forwarding logic.
 - `server/catalog.json` — generated snapshot of the live server's `tools/list` /
   `resources/list`. **Do not edit by hand.**
 - `scripts/generate-catalog.js` — regenerates `server/catalog.json` from a running build.
 - `scripts/test-e2e.js` — end-to-end tests (live forwarding, app-down fallback, mid-session
   recovery).
 
-## Workflow
+## Development
 
 ```sh
 npm install                  # once, and after dependency changes
-npm run generate-catalog     # once after catalog changes; needs Merlin Project running
+npm run generate-catalog     # after the app's tool metadata changes; needs Merlin Project running
 npm test                     # phase A needs Merlin Project running; B and C are self-contained
-npm run pack                 # builds the .mcpb archive for marketplace submission
+npm run pack                 # builds MerlinProject.mcpb
 ```
 
-Swift's `MCPCatalog` remains the single source of truth for tool/resource metadata: the catalog
-snapshot is generated from a live server (which serves that catalog), never written by hand.
-Regenerate it and re-pack whenever the catalog changes.
+Merlin Project itself is the single source of truth for tool and resource metadata:
+`server/catalog.json` is generated by asking a running app for its `tools/list` and
+`resources/list` and snapshotting the responses verbatim. It is committed so that packaging the
+extension needs no running app. Regenerate it and re-pack whenever the app's tool metadata
+changes.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
